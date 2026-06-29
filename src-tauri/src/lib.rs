@@ -33,12 +33,28 @@ pub struct Config {
     /// 休息时长(秒)
     #[serde(default = "default_break")]
     pub break_seconds: u32,
+    /// 是否开机自启动
+    #[serde(default = "default_autostart")]
+    pub autostart: bool,
+    /// 取消休息的全局快捷键(空 = 不启用)
+    #[serde(default = "default_cancel_hotkey")]
+    pub cancel_hotkey: String,
+    /// 遮罩背景颜色(hex,#RRGGBB)
+    #[serde(default = "default_bg_color")]
+    pub background_color: String,
+    /// 遮罩背景透明度(0-100)
+    #[serde(default = "default_bg_opacity")]
+    pub background_opacity: u32,
 }
 
 fn default_mode() -> String { "interval".to_string() }
 fn default_interval() -> u32 { 30 }
 fn default_cron() -> String { "0 0 */30 * * * *".to_string() }
 fn default_break() -> u32 { 20 }
+fn default_autostart() -> bool { false }
+fn default_cancel_hotkey() -> String { "Escape".to_string() }
+fn default_bg_color() -> String { "#0F1115".to_string() }
+fn default_bg_opacity() -> u32 { 45 }
 
 impl Default for Config {
     fn default() -> Self {
@@ -47,6 +63,10 @@ impl Default for Config {
             interval_minutes: default_interval(),
             cron_expression: default_cron(),
             break_seconds: default_break(),
+            autostart: default_autostart(),
+            cancel_hotkey: default_cancel_hotkey(),
+            background_color: default_bg_color(),
+            background_opacity: default_bg_opacity(),
         }
     }
 }
@@ -184,6 +204,65 @@ async fn close_overlay(app: AppHandle) -> Result<(), String> {
 async fn get_break_seconds(state: State<'_, Arc<AppState>>) -> Result<u32, String> {
     let cfg = state.config.lock().await;
     Ok(cfg.break_seconds)
+}
+
+/// 计算接下来 count 次的触发时间,RFC3339 字符串数组
+/// 支持两种模式:
+///   - "interval": 从现在开始每次 + interval_minutes
+///   - "cron":     用 cron::Schedule::after 取未来 count 个时间
+#[tauri::command]
+async fn get_next_breaks(
+    state: State<'_, Arc<AppState>>,
+    count: u32,
+) -> Result<Vec<String>, String> {
+    let cfg = state.config.lock().await.clone();
+    let n = count.clamp(1, 20) as usize;
+    let mut out = Vec::with_capacity(n);
+
+    match cfg.mode.as_str() {
+        "interval" => {
+            let secs = (cfg.interval_minutes as i64) * 60;
+            let mut next = Utc::now() + chrono::Duration::seconds(secs);
+            for _ in 0..n {
+                out.push(next.to_rfc3339());
+                next = next + chrono::Duration::seconds(secs);
+            }
+        }
+        "cron" => {
+            let schedule = Schedule::from_str(&cfg.cron_expression)
+                .map_err(|e| format!("无效 cron 表达式: {e}"))?;
+            let mut iter = schedule.after(&Utc::now());
+            for _ in 0..n {
+                if let Some(dt) = iter.next() {
+                    out.push(dt.to_rfc3339());
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(out)
+}
+
+// ============================================================
+// 开机自启动 (tauri-plugin-autostart)
+// ============================================================
+
+#[tauri::command]
+async fn enable_autostart(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().enable().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn disable_autostart(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().disable().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -349,6 +428,10 @@ fn show_main_window(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(Arc::new(AppState::default()))
         .setup(|app| {
             // 从 store 加载配置
@@ -424,6 +507,10 @@ pub fn run() {
             trigger_break,
             close_overlay,
             get_break_seconds,
+            get_next_breaks,
+            enable_autostart,
+            disable_autostart,
+            is_autostart_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,18 +1,46 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
   import { onMount, onDestroy } from "svelte";
+  import { matches as hotkeyMatches } from "./lib/hotkey.js";
 
   let remaining = $state(0);
   let timerId = null;
 
-  // 加载本次休息秒数,开始倒计时
+  // 用户在主窗口配置的背景色/透明度/取消快捷键
+  let bgColor = $state("#0F1115");
+  let bgOpacity = $state(45);
+  let cancelHotkey = $state("Escape");
+
+  // 把 hex 转 RGB 三元组
+  function hexToRgb(hex) {
+    const m = hex.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/);
+    if (!m) return "15, 17, 21";
+    return `${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}`;
+  }
+
+  // 派生:动态背景
+  let frostBg = $derived(
+    `rgba(${hexToRgb(bgColor)}, ${bgOpacity / 100})`
+  );
+
   onMount(async () => {
+    // 加载倒计时秒数
     try {
       remaining = await invoke("get_break_seconds");
     } catch {
       remaining = 20;
     }
     startTick();
+
+    // 读取背景与取消快捷键设置
+    try {
+      const cfg = await invoke("get_config");
+      bgColor = cfg.background_color || "#0F1115";
+      bgOpacity = cfg.background_opacity ?? 45;
+      cancelHotkey = cfg.cancel_hotkey || "Escape";
+    } catch (err) {
+      console.error("get_config:", err);
+    }
   });
 
   onDestroy(() => {
@@ -47,9 +75,20 @@
     remaining = 0;
     stop();
   }
+
+  // 监听取消快捷键
+  function handleKeyDown(event) {
+    if (cancelHotkey && hotkeyMatches(event, cancelHotkey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      skip();
+    }
+  }
 </script>
 
-<div class="frosted-layer"></div>
+<svelte:window onkeydown={handleKeyDown} />
+
+<div class="frosted-layer" style:background={frostBg}></div>
 <main class="overlay">
   <div class="badge">休息时间</div>
   <h1 class="title">该休息一下啦</h1>
