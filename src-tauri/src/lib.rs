@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder},
+    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
@@ -362,12 +362,28 @@ pub fn run() {
             }
 
             // ---- 托盘菜单 ----
-            let settings = MenuItemBuilder::with_id("settings", "设置").build(app)?;
-            let trigger  = MenuItemBuilder::with_id("trigger",  "立即休息").build(app)?;
-            let toggle   = MenuItemBuilder::with_id("toggle",   "切换调度").build(app)?;
-            let quit     = MenuItemBuilder::with_id("quit",     "退出").build(app)?;
+            // 用链式 .item() 而不是批量 .items(&[...]),
+            // 规避某些情况下只有部分 item 被注册的 bug
+            let settings = MenuItemBuilder::with_id("settings", "设置")
+                .enabled(true)
+                .build(app)?;
+            let trigger  = MenuItemBuilder::with_id("trigger",  "立即休息")
+                .enabled(true)
+                .build(app)?;
+            let toggle   = MenuItemBuilder::with_id("toggle",   "切换调度")
+                .enabled(true)
+                .build(app)?;
+            let quit     = MenuItemBuilder::with_id("quit",     "退出")
+                .enabled(true)
+                .build(app)?;
+            let sep      = PredefinedMenuItem::separator(app)?;
+
             let menu = MenuBuilder::new(app)
-                .items(&[&settings, &trigger, &toggle, &quit])
+                .item(&settings)
+                .item(&trigger)
+                .item(&toggle)
+                .item(&sep)
+                .item(&quit)
                 .build()?;
 
             let icon = app
