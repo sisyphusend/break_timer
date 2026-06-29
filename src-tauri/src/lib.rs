@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use tauri::{
-    menu::{CheckMenuItem, CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
+    menu::{MenuBuilder, MenuItem, MenuItemBuilder, SubmenuBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
@@ -91,12 +91,23 @@ pub struct AppState {
     pub status_menu: Mutex<Option<StatusMenuHandles>>,
 }
 
-/// 托盘"状态"子菜单里 3 个可勾选菜单项的句柄
+/// 托盘"状态"子菜单里 3 个菜单项的句柄
+/// (用普通 MenuItem + set_text 拼前缀 '✔ ' 实现勾状态;
+///  不用 CheckMenuItem 是因为它在 Windows 上 set_checked(false) 不可靠)
 #[derive(Clone)]
 pub struct StatusMenuHandles {
-    pub start: CheckMenuItem<tauri::Wry>,
-    pub stop: CheckMenuItem<tauri::Wry>,
-    pub test: CheckMenuItem<tauri::Wry>,
+    pub start: MenuItem<tauri::Wry>,
+    pub stop: MenuItem<tauri::Wry>,
+    pub test: MenuItem<tauri::Wry>,
+}
+
+/// 给活动项加 '✔ ' 前缀(实现 radio-button 视觉),其余保持原 label
+fn status_label(base: &str, is_active: bool) -> String {
+    if is_active {
+        format!("✔ {base}")
+    } else {
+        base.to_string()
+    }
 }
 
 /// 把状态子菜单的勾切到 active ("start" | "stop" | "test")
@@ -104,9 +115,9 @@ fn set_status_check(app: &AppHandle, active: &str) {
     let state = app.state::<Arc<AppState>>();
     let menu_lock = state.status_menu.blocking_lock();
     if let Some(h) = menu_lock.as_ref() {
-        let _ = h.start.set_checked(active == "start");
-        let _ = h.stop.set_checked(active == "stop");
-        let _ = h.test.set_checked(active == "test");
+        let _ = h.start.set_text(status_label("启动", active == "start"));
+        let _ = h.stop.set_text(status_label("停止", active == "stop"));
+        let _ = h.test.set_text(status_label("立即测试", active == "test"));
     }
 }
 
@@ -506,17 +517,14 @@ pub fn run() {
                 .enabled(true)
                 .build(app)?;
 
-            // "状态"子菜单里 3 个可勾选项,默认 启动 已勾
-            let mi_start = CheckMenuItemBuilder::with_id("start", "启动")
-                .checked(true)
+            // "状态"子菜单里 3 项,用文字前缀 '✔ ' 显示当前选中
+            let mi_start = MenuItemBuilder::with_id("start", "✔ 启动")
                 .enabled(true)
                 .build(app)?;
-            let mi_stop = CheckMenuItemBuilder::with_id("stop", "停止")
-                .checked(false)
+            let mi_stop = MenuItemBuilder::with_id("stop", "停止")
                 .enabled(true)
                 .build(app)?;
-            let mi_test = CheckMenuItemBuilder::with_id("test", "立即测试")
-                .checked(false)
+            let mi_test = MenuItemBuilder::with_id("test", "立即测试")
                 .enabled(true)
                 .build(app)?;
 
