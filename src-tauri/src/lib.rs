@@ -143,12 +143,11 @@ async fn save_config(
     Ok(())
 }
 
-#[tauri::command]
-async fn start_scheduler(
-    app: AppHandle,
-    state: State<'_, Arc<AppState>>,
-) -> Result<SchedulerStatus, String> {
-    // 如果已经在跑,先停掉
+// ============================================================
+// 调度的内部实现(供 #[tauri::command] 与 on_menu_event 共用)
+// ============================================================
+
+async fn do_start(app: &AppHandle, state: Arc<AppState>) -> Result<SchedulerStatus, String> {
     {
         let mut handle = state.scheduler.lock().await;
         if let Some(t) = handle.task.take() {
@@ -160,9 +159,7 @@ async fn start_scheduler(
     validate_config(&config).map_err(|e| e.to_string())?;
 
     let app_handle = app.clone();
-    let state_arc: Arc<AppState> = (*state).clone();
-
-    // 启动调度任务
+    let state_arc = state.clone();
     let task = tokio::spawn(async move {
         run_scheduler(app_handle, state_arc, config).await;
     });
@@ -176,17 +173,12 @@ async fn start_scheduler(
         *running = true;
     }
 
-    set_status_check(&app, "start");
+    set_status_check(app, "start");
 
-    let status = get_status_inner(&state).await;
-    Ok(status)
+    Ok(get_status_inner_from_arc(&state).await)
 }
 
-#[tauri::command]
-async fn stop_scheduler(
-    app: AppHandle,
-    state: State<'_, Arc<AppState>>,
-) -> Result<SchedulerStatus, String> {
+async fn do_stop(app: &AppHandle, state: Arc<AppState>) -> Result<SchedulerStatus, String> {
     {
         let mut handle = state.scheduler.lock().await;
         if let Some(t) = handle.task.take() {
@@ -202,9 +194,42 @@ async fn stop_scheduler(
         *next = None;
     }
 
-    set_status_check(&app, "stop");
+    set_status_check(app, "stop");
 
-    Ok(get_status_inner(&state).await)
+    Ok(get_status_inner_from_arc(&state).await)
+}
+
+async fn do_test(
+    app: &AppHandle,
+    state: Arc<AppState>,
+) -> Result<(), String> {
+    set_status_check(app, "test");
+    show_overlay(app, &state).await.map_err(|e| e.to_string())
+}
+
+async fn get_status_inner_from_arc(state: &Arc<AppState>) -> SchedulerStatus {
+    let running = *state.running.lock().await;
+    let next = *state.next_break_at.lock().await;
+    SchedulerStatus {
+        running,
+        next_break_at: next,
+    }
+}
+
+#[tauri::command]
+async fn start_scheduler(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SchedulerStatus, String> {
+    do_start(&app, state.inner().clone()).await
+}
+
+#[tauri::command]
+async fn stop_scheduler(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SchedulerStatus, String> {
+    do_stop(&app, state.inner().clone()).await
 }
 
 #[tauri::command]
@@ -217,9 +242,7 @@ async fn trigger_break(
     app: AppHandle,
     state: State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
-    set_status_check(&app, "test");
-    show_overlay(&app, &state).await.map_err(|e| e.to_string())?;
-    Ok(())
+    do_test(&app, state.inner().clone()).await
 }
 
 #[tauri::command]
@@ -529,19 +552,46 @@ pub fn run() {
                 .tooltip("BreakTimer · 休息提醒")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id().as_ref() {
-                    "settings" => show_main_window(app),
-                    "start" => {
-                        let _ = app.emit("tray-start", ());
+                .on_menu_event(|app, event| {
+                    let id = event.id().as_ref().to_string();
+                    match id.as_str() {
+                        "settings" => show_main_window(app),
+                        "start" => {
+                            let h = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let state = h.state::<Arc<AppState>>().inner().clone();
+                                match do_start(&h, state).await {
+                                    Ok(s) => {
+                                        let _ = h.emit("scheduler-status", s);
+                                    }
+                                    Err(e) => eprintln!("tray start: {e}"),
+                                }
+                            });
+                        }
+                        "stop" => {
+                            let h = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let state = h.state::<Arc<AppState>>().inner().clone();
+                                match do_stop(&h, state).await {
+                                    Ok(s) => {
+                                        let _ = h.emit("scheduler-status", s);
+                                    }
+                                    Err(e) => eprintln!("tray stop: {e}"),
+                                }
+                            });
+                        }
+                        "test" => {
+                            let h = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let state = h.state::<Arc<AppState>>().inner().clone();
+                                if let Err(e) = do_test(&h, state).await {
+                                    eprintln!("tray test: {e}");
+                                }
+                            });
+                        }
+                        "quit" => app.exit(0),
+                        _ => {}
                     }
-                    "stop" => {
-                        let _ = app.emit("tray-stop", ());
-                    }
-                    "test" => {
-                        let _ = app.emit("tray-test", ());
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {

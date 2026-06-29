@@ -121,27 +121,10 @@
     };
   });
 
-  // 托盘"状态"子菜单 3 项的点击 → 后端发 tray-start/tray-stop/tray-test
-  listen("tray-start", async () => {
-    try {
-      status = await invoke("start_scheduler");
-    } catch (err) {
-      console.error("tray-start:", err);
-    }
-  });
-  listen("tray-stop", async () => {
-    try {
-      status = await invoke("stop_scheduler");
-    } catch (err) {
-      console.error("tray-stop:", err);
-    }
-  });
-  listen("tray-test", async () => {
-    try {
-      await invoke("trigger_break");
-    } catch (err) {
-      console.error("tray-test:", err);
-    }
+  // 托盘子菜单 3 项点了之后,后端直接调内部实现 + emit "scheduler-status"
+  // 这条路径下前端只需要 listen 这个状态事件来同步 UI
+  listen("scheduler-status", (event) => {
+    status = event.payload;
   });
 
   // ============================================================
