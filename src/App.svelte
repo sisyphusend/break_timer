@@ -90,6 +90,15 @@
       console.error("get_status:", err);
     }
 
+    // 自动启动调度器:返回式用户直接看到"运行中"状态
+    if (!status.running) {
+      try {
+        status = await invoke("start_scheduler");
+      } catch (err) {
+        console.error("auto-start scheduler:", err);
+      }
+    }
+
     // 初次拉取未来触发时间
     refreshNextBreaks();
 
@@ -219,10 +228,27 @@
 <svelte:window onkeydown={handleKeyDown} />
 
 <main class="container">
-  <header>
+  <header class="app-header">
     <h1>BreakTimer</h1>
     <p class="subtitle">到点全屏提醒，护眼护身体</p>
   </header>
+
+  <!-- 运行状态卡(始终可见) -->
+  <section class="card">
+    <h2>运行状态</h2>
+    <p class={statusClass}>{statusText}</p>
+    <p class="next">{nextText}</p>
+
+    <div class="actions">
+      <button class="btn primary" disabled={status.running} onclick={startScheduler}>
+        启动
+      </button>
+      <button class="btn ghost" disabled={!status.running} onclick={stopScheduler}>
+        停止
+      </button>
+      <button class="btn ghost" onclick={testBreak}>立即测试</button>
+    </div>
+  </section>
 
   <!-- Tab 导航 -->
   <div class="tabs" role="tablist">
@@ -406,22 +432,7 @@
     </section>
   {/if}
 
-  <!-- 运行状态 + 启动/停止 / 测试 -->
-  <section class="card">
-    <h2>运行状态</h2>
-    <p class={statusClass}>{statusText}</p>
-    <p class="next">{nextText}</p>
-
-    <div class="actions">
-      <button class="btn primary" disabled={status.running} onclick={startScheduler}>
-        启动
-      </button>
-      <button class="btn ghost" disabled={!status.running} onclick={stopScheduler}>
-        停止
-      </button>
-      <button class="btn ghost" onclick={testBreak}>立即测试</button>
-    </div>
-  </section>
+  <!-- (运行状态 + 启动/停止 / 测试 已上移到顶部) -->
 </main>
 
 <style>
@@ -431,11 +442,14 @@
     padding: 24px 24px 60px;
   }
 
-  header { margin-bottom: 20px; }
+  header.app-header {
+    margin-bottom: 20px;
+    text-align: center;
+  }
 
   h1 {
     margin: 0 0 4px;
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 600;
   }
 
@@ -744,12 +758,12 @@
 
   .btn {
     flex: 1;
-    padding: 10px 16px;
+    padding: 8px 12px;
     border: 1px solid var(--card-border);
     border-radius: 6px;
     background: var(--card);
     color: var(--text);
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     transition: all 0.15s;
   }

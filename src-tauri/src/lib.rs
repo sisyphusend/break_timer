@@ -51,7 +51,7 @@ fn default_mode() -> String { "interval".to_string() }
 fn default_interval() -> u32 { 30 }
 fn default_cron() -> String { "0 0 */30 * * * *".to_string() }
 fn default_break() -> u32 { 20 }
-fn default_autostart() -> bool { false }
+fn default_autostart() -> bool { true }
 fn default_cancel_hotkey() -> String { "Escape".to_string() }
 fn default_bg_color() -> String { "#0F1115".to_string() }
 fn default_bg_opacity() -> u32 { 45 }
