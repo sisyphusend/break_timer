@@ -1,8 +1,10 @@
 import { defineConfig } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
-console.log("[vite.config] loaded, setting port 1420");
+console.log("[vite.config] loaded, setting port 1420, with Svelte 5");
 
 export default defineConfig({
+  plugins: [svelte()],
   server: {
     port: 1420,
     strictPort: true,

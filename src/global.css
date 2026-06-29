@@ -1,0 +1,28 @@
+/* 全局基础样式 — 主窗口和遮罩窗口共用 */
+
+:root {
+  --bg: #0f1115;
+  --card: #1a1d24;
+  --card-border: #2a2f3a;
+  --text: #e6e8ee;
+  --text-dim: #8a92a6;
+  --primary: #4f8cff;
+  --primary-hover: #3d75e0;
+  --danger: #ff5c5c;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+button {
+  font-family: inherit;
+}

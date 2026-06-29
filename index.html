@@ -4,60 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BreakTimer · 休息提醒</title>
-    <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
-    <main class="container">
-      <header>
-        <h1>BreakTimer</h1>
-        <p class="subtitle">到点全屏提醒，护眼护身体</p>
-      </header>
-
-      <section class="card">
-        <h2>调度方式</h2>
-        <div class="mode-switch">
-          <label class="mode-option">
-            <input type="radio" name="mode" value="interval" checked />
-            <span>固定间隔</span>
-          </label>
-          <label class="mode-option">
-            <input type="radio" name="mode" value="cron" />
-            <span>Cron 表达式</span>
-          </label>
-        </div>
-
-        <div class="field" id="interval-field">
-          <label for="interval-min">间隔分钟数</label>
-          <input id="interval-min" type="number" min="1" value="30" />
-        </div>
-
-        <div class="field" id="cron-field" hidden>
-          <label>触发规则</label>
-          <div id="cron-builder"></div>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>休息时长</h2>
-        <div class="field">
-          <label for="break-sec">休息秒数</label>
-          <input id="break-sec" type="number" min="5" value="20" />
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>状态</h2>
-        <p id="status-text" class="status">未启动</p>
-        <p id="next-text" class="next"></p>
-      </section>
-
-      <div class="actions">
-        <button id="start-btn" class="btn primary">启动</button>
-        <button id="stop-btn" class="btn ghost" disabled>停止</button>
-        <button id="test-btn" class="btn ghost">立即测试</button>
-      </div>
-    </main>
-
-    <script type="module" src="./src/main.js"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
