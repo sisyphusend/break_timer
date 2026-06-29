@@ -1,0 +1,27 @@
+[package]
+name = "break-timer"
+version = "0.1.0"
+description = "BreakTimer - 休息提醒 Windows 桌面应用"
+authors = ["sisyphus"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "break_timer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-store = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+cron = "0.17"
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

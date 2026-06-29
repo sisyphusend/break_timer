@@ -1,0 +1,23 @@
+# Node
+node_modules/
+dist/
+
+# Rust / Cargo
+src-tauri/target/
+src-tauri/Cargo.lock
+src-tauri/gen/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# 构建产物
+*.exe
+*.msi
+*.dmg
+*.deb
+*.AppImage
+*.app
