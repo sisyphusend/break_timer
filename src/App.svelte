@@ -64,40 +64,17 @@
     }, 5000);
 
     // 托盘菜单事件 (Rust emit 过来)
-    const off1 = listen("tray-toggle-scheduler", toggleScheduler);
-    const off2 = listen("tray-trigger-break", triggerBreak);
+    // 已移除 tray-toggle-scheduler 和 tray-trigger-break 的监听,
+    // 托盘菜单只保留"设置"和"退出"两项
 
     return () => {
       clearInterval(timer);
-      off1.then((fn) => fn());
-      off2.then((fn) => fn());
     };
   });
 
   // ============================================================
-  // 业务操作
+  // 业务操作(原 toggleScheduler / triggerBreak 已随托盘菜单移除)
   // ============================================================
-
-  async function toggleScheduler() {
-    try {
-      const newRunning = !status.running;
-      if (status.running) {
-        status = await invoke("stop_scheduler");
-      } else {
-        status = await invoke("start_scheduler");
-      }
-    } catch (err) {
-      console.error("toggle:", err);
-    }
-  }
-
-  async function triggerBreak() {
-    try {
-      await invoke("trigger_break");
-    } catch (err) {
-      console.error("trigger:", err);
-    }
-  }
 
   // 收集当前表单 → config (期望后端格式)
   function readConfig() {
