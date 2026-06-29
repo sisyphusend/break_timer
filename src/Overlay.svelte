@@ -152,9 +152,10 @@
 
 <style>
   /* html/body 样式需要全局生效(无法 scope) */
-  :global(html), :global(body) {
+  :global(html), :global(body), :global(#app) {
     width: 100%;
     height: 100%;
+    margin: 0;
     overflow: hidden;
     font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
     color: white;
@@ -181,7 +182,9 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 40px;
+    padding: 32px 24px;
+    gap: 16px;
+    box-sizing: border-box;
   }
 
   .badge {
@@ -193,22 +196,19 @@
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.05em;
-    margin-bottom: 24px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
 
   .title {
-    font-size: 64px;
+    font-size: 56px;
     font-weight: 700;
-    margin: 0 0 16px;
+    margin: 0;
     text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
   }
 
   .illustration {
-    width: 100%;
-    max-width: 560px;
-    margin: 0 auto 48px;
+    width: min(100%, 480px);
     border-radius: 14px;
     overflow: hidden;
     box-shadow:
@@ -223,16 +223,15 @@
   }
 
   .countdown {
-    font-size: 160px;
+    font-size: 120px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    margin-bottom: 48px;
     text-shadow: 0 4px 40px rgba(0, 0, 0, 0.4);
     font-feature-settings: "tnum";
   }
 
-  .actions { margin-top: 16px; }
+  .actions { padding-top: 8px; }
 
   .btn {
     padding: 12px 32px;
