@@ -1,5 +1,6 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import CronBuilder from "./lib/CronBuilder.svelte";
   import { formatCombo } from "./lib/hotkey.js";
@@ -120,6 +121,29 @@
     };
   });
 
+  // 托盘"状态"子菜单 3 项的点击 → 后端发 tray-start/tray-stop/tray-test
+  listen("tray-start", async () => {
+    try {
+      status = await invoke("start_scheduler");
+    } catch (err) {
+      console.error("tray-start:", err);
+    }
+  });
+  listen("tray-stop", async () => {
+    try {
+      status = await invoke("stop_scheduler");
+    } catch (err) {
+      console.error("tray-stop:", err);
+    }
+  });
+  listen("tray-test", async () => {
+    try {
+      await invoke("trigger_break");
+    } catch (err) {
+      console.error("tray-test:", err);
+    }
+  });
+
   // ============================================================
   // 持久化(防抖 500ms 自动保存)
   // ============================================================
@@ -233,21 +257,12 @@
     <p class="subtitle">到点全屏提醒，护眼护身体</p>
   </header>
 
-  <!-- 运行状态卡(始终可见) -->
+  <!-- 运行状态卡(始终可见)— 启动/停止/测试按钮已迁移到托盘子菜单 -->
   <section class="card">
     <h2>运行状态</h2>
     <p class={statusClass}>{statusText}</p>
     <p class="next">{nextText}</p>
-
-    <div class="actions">
-      <button class="btn primary" disabled={status.running} onclick={startScheduler}>
-        启动
-      </button>
-      <button class="btn ghost" disabled={!status.running} onclick={stopScheduler}>
-        停止
-      </button>
-      <button class="btn ghost" onclick={testBreak}>立即测试</button>
-    </div>
+    <p class="hint">启动 / 停止 / 立即测试 → 托盘右键 → 状态</p>
   </section>
 
   <!-- Tab 导航 -->

@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder},
+    menu::{CheckMenuItem, CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
@@ -86,6 +86,28 @@ pub struct AppState {
     pub scheduler: Mutex<SchedulerHandle>,
     pub running: Mutex<bool>,
     pub next_break_at: Mutex<Option<DateTime<Utc>>>,
+    /// 托盘"状态"子菜单里的 3 个 CheckMenuItem 句柄
+    /// (在 setup 里赋值,命令成功后调 set_status_check 切换勾)
+    pub status_menu: Mutex<Option<StatusMenuHandles>>,
+}
+
+/// 托盘"状态"子菜单里 3 个可勾选菜单项的句柄
+#[derive(Clone)]
+pub struct StatusMenuHandles {
+    pub start: CheckMenuItem<tauri::Wry>,
+    pub stop: CheckMenuItem<tauri::Wry>,
+    pub test: CheckMenuItem<tauri::Wry>,
+}
+
+/// 把状态子菜单的勾切到 active ("start" | "stop" | "test")
+fn set_status_check(app: &AppHandle, active: &str) {
+    let state = app.state::<Arc<AppState>>();
+    let menu_lock = state.status_menu.blocking_lock();
+    if let Some(h) = menu_lock.as_ref() {
+        let _ = h.start.set_checked(active == "start");
+        let _ = h.stop.set_checked(active == "stop");
+        let _ = h.test.set_checked(active == "test");
+    }
 }
 
 // ============================================================
@@ -154,12 +176,17 @@ async fn start_scheduler(
         *running = true;
     }
 
+    set_status_check(&app, "start");
+
     let status = get_status_inner(&state).await;
     Ok(status)
 }
 
 #[tauri::command]
-async fn stop_scheduler(state: State<'_, Arc<AppState>>) -> Result<SchedulerStatus, String> {
+async fn stop_scheduler(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SchedulerStatus, String> {
     {
         let mut handle = state.scheduler.lock().await;
         if let Some(t) = handle.task.take() {
@@ -175,6 +202,8 @@ async fn stop_scheduler(state: State<'_, Arc<AppState>>) -> Result<SchedulerStat
         *next = None;
     }
 
+    set_status_check(&app, "stop");
+
     Ok(get_status_inner(&state).await)
 }
 
@@ -188,6 +217,7 @@ async fn trigger_break(
     app: AppHandle,
     state: State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
+    set_status_check(&app, "test");
     show_overlay(&app, &state).await.map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -445,7 +475,7 @@ pub fn run() {
             }
 
             // ---- 托盘菜单 ----
-            // 只保留"设置"和"退出"两个高频操作
+            // 设置 / 状态(子菜单:启动✔ 停止 测试)/ 退出
             let settings = MenuItemBuilder::with_id("settings", "设置")
                 .enabled(true)
                 .build(app)?;
@@ -453,8 +483,39 @@ pub fn run() {
                 .enabled(true)
                 .build(app)?;
 
+            // "状态"子菜单里 3 个可勾选项,默认 启动 已勾
+            let mi_start = CheckMenuItemBuilder::with_id("start", "启动")
+                .checked(true)
+                .enabled(true)
+                .build(app)?;
+            let mi_stop = CheckMenuItemBuilder::with_id("stop", "停止")
+                .checked(false)
+                .enabled(true)
+                .build(app)?;
+            let mi_test = CheckMenuItemBuilder::with_id("test", "立即测试")
+                .checked(false)
+                .enabled(true)
+                .build(app)?;
+
+            // 把 3 个句柄存到 AppState,start/stop/trigger 命令会调 set_status_check
+            {
+                let mut menu_lock = state.status_menu.blocking_lock();
+                *menu_lock = Some(StatusMenuHandles {
+                    start: mi_start.clone(),
+                    stop: mi_stop.clone(),
+                    test: mi_test.clone(),
+                });
+            }
+
+            let status_submenu = SubmenuBuilder::new(app, "状态")
+                .item(&mi_start)
+                .item(&mi_stop)
+                .item(&mi_test)
+                .build()?;
+
             let menu = MenuBuilder::new(app)
                 .item(&settings)
+                .item(&status_submenu)
                 .item(&quit)
                 .build()?;
 
@@ -470,6 +531,15 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "settings" => show_main_window(app),
+                    "start" => {
+                        let _ = app.emit("tray-start", ());
+                    }
+                    "stop" => {
+                        let _ = app.emit("tray-stop", ());
+                    }
+                    "test" => {
+                        let _ = app.emit("tray-test", ());
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
